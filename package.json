@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@google/generative-ai": "latest",
+    "@google/genai": "latest",
     "bedrock-protocol": "latest"
   }
 }
