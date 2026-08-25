@@ -33,8 +33,11 @@ function initBot() {
     port: port,
     username: 'Alice',
     offline: true, // Set to false if connecting to an online-mode Xbox server
-    connectTimeout: 120000, // 2 minutes timeout to handle slow UDP handshakes
-    version: '1.20.40'
+    version: '1.26.40',
+    skipPing: true,
+    followPort: false,
+    raknetBackend: 'jsp-raknet',
+    connectTimeout: 120000 // 2 minutes timeout to handle slow UDP handshakes
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
