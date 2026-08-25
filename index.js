@@ -33,7 +33,8 @@ function initBot() {
     port: port,
     username: 'Alice',
     offline: true, // Set to false if connecting to an online-mode Xbox server
-    connectTimeout: 120000 // 2 minutes timeout to handle slow UDP handshakes
+    connectTimeout: 120000, // 2 minutes timeout to handle slow UDP handshakes
+    version: '1.20.40'
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
