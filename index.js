@@ -26,16 +26,23 @@ function initBot() {
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
 
-  const client = bedrock.createClient({
-    host: host,
-    port: port,
-    username: 'Alice',
-    offline: true,
-    version: '1.26.40',
-    skipPing: false,               // Przywracamy ping, aby wymusić natychmiastowe wysłanie unkompressed RakNet handshake
-    connectTimeout: 10000,          // Krótki timeout (10s), by od razu ponawiać próbę przy gubieniu pakietów
-    concurrency: 1
-  });
+  let client;
+
+  try {
+    client = bedrock.createClient({
+      host: host,
+      port: port,
+      username: 'Alice',
+      offline: true,
+      version: '1.26.40',
+      skipPing: true // Musi być true, żeby nie wywalało błędnego ping timed out przed połączeniem!
+    });
+  } catch (err) {
+    console.error('[BOT INIT ERROR]', err.message || err);
+    console.log('[BOT] Retrying connection in 5 seconds...');
+    setTimeout(initBot, 5000);
+    return;
+  }
 
   let botPosition = { x: 0, y: 0, z: 0 };
   let isProcessing = false;
@@ -91,11 +98,13 @@ function initBot() {
 
   client.on('error', (err) => {
     console.error('[BOT ERROR]', err.message || err);
+    // Jeśli wywali błąd połączenia po zainicjowaniu, wymuszamy rozłączenie i reconnect
+    client.close();
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 3 seconds...');
-    setTimeout(initBot, 3000); // Szybki auto-reconnect po 3 sekundach
+    console.log('[BOT] Connection closed. Reconnecting in 5 seconds...');
+    setTimeout(initBot, 5000);
   });
 }
 
