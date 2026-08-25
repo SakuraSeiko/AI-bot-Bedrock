@@ -33,7 +33,7 @@ function initBot() {
     port: port,
     username: 'Alice',
     offline: true, // Set to false if connecting to an online-mode Xbox server
-    version: '1.26.40.8'
+    version: '1.26.40'
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
