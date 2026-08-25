@@ -1,0 +1,13 @@
+{
+  "name": "alice-bedrock-bot",
+  "version": "1.0.0",
+  "description": "Minecraft Bedrock AI Bot powered by Gemini API",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^0.1.1",
+    "bedrock-protocol": "^1.27.0"
+  }
+}
