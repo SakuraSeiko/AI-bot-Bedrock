@@ -1,4 +1,5 @@
 const http = require('http');
+const dns = require('dns');
 const bedrock = require('bedrock-protocol');
 const { initGemini, analyzeMessage } = require('./gemini');
 
@@ -13,31 +14,44 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`[SYSTEM] Web server listening on port ${PORT}`);
   initGemini();
-  initBot();
+  resolveAndStart();
 });
 
-function initBot() {
+function resolveAndStart() {
+  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
+  
+  // Automatyczne sprawdzenie numeru IP bezpośrednio w Node.js
+  dns.lookup(host, (err, address) => {
+    if (err) {
+      console.error(`[DNS ERROR] Nie udalo sie pobrac IP dla ${host}:`, err.message);
+      initBot(host); // Proba polaczenia po domenie w razie bledu
+    } else {
+      console.log(`[DNS SUCCESS] Domena ${host} wskazuje na IP: ${address}`);
+      initBot(address); // Przekazanie czystego IP do bota
+    }
+  });
+}
+
+function initBot(targetHost) {
   if (!process.env.GEMINI_API_KEY) {
     console.error('[ERROR] GEMINI_API_KEY environment variable is missing!');
     return;
   }
 
-  // Set host and port for your Bedrock server
-  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
-  console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
+  console.log(`[BOT] Connecting to Bedrock server ${targetHost}:${port}...`);
 
   const client = bedrock.createClient({
-    host: host,
+    host: targetHost,
     port: port,
     username: 'Alice',
-    offline: true, // Set to false if connecting to an online-mode Xbox server
+    offline: true,
     version: '1.26.40',
     skipPing: true,
     followPort: false,
     raknetBackend: 'jsp-raknet',
-    connectTimeout: 15000 // Skrócony timeout, by natychmiast wychwycić brak odpowiedzi
+    connectTimeout: 15000
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
@@ -47,25 +61,20 @@ function initBot() {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
   });
 
-  // Track player coordinates from Bedrock packets
   client.on('move_player', (packet) => {
     if (packet.runtime_id === client.entityId) {
       botPosition = packet.position;
     }
   });
 
-  // Listen for incoming chat messages
   client.on('text', async (packet) => {
-    // Extract message content and sender name from Bedrock packet formats
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignore empty messages or messages sent by the bot itself
     if (!messageText.trim() || sourceName.includes('Alice') || sourceName === client.username) return;
 
     console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
 
-    // Prevent concurrent Gemini processing
     if (isProcessing) return;
     isProcessing = true;
 
@@ -93,7 +102,7 @@ function initBot() {
 
   client.on('close', () => {
     console.log('[BOT] Connection closed. Reconnecting in 10 seconds...');
-    setTimeout(initBot, 10000);
+    setTimeout(resolveAndStart, 10000);
   });
 }
 
