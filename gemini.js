@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
+const { GoogleGenAI, Type } = require('@google/genai');
 
 let ai = null;
 
@@ -7,7 +7,7 @@ function initGemini() {
     console.error('[GEMINI ERROR] Missing GEMINI_API_KEY environment variable!');
     return;
   }
-  ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   console.log('[GEMINI] Initialized successfully.');
 }
 
@@ -22,32 +22,33 @@ Your current position is X:${Math.round(botPos.x)}, Y:${Math.round(botPos.y)}, Z
 Decide whether to reply with text or perform an action.
 Respond ONLY in valid JSON matching the schema.`;
 
-    const model = ai.getGenerativeModel({
+    const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      generationConfig: {
+      contents: prompt,
+      config: {
         responseMimeType: 'application/json',
         responseSchema: {
-          type: SchemaType.OBJECT,
+          type: Type.OBJECT,
           properties: {
             type: {
-              type: SchemaType.STRING,
+              type: Type.STRING,
               enum: ['text', 'function']
             },
             text: {
-              type: SchemaType.STRING,
+              type: Type.STRING,
               description: 'Message to respond in chat if type is text'
             },
             action: {
-              type: SchemaType.OBJECT,
+              type: Type.OBJECT,
               properties: {
                 name: {
-                  type: SchemaType.STRING,
+                  type: Type.STRING,
                   enum: ['chatMessage']
                 },
                 args: {
-                  type: SchemaType.OBJECT,
+                  type: Type.OBJECT,
                   properties: {
-                    message: { type: SchemaType.STRING }
+                    message: { type: Type.STRING }
                   }
                 }
               }
@@ -58,8 +59,7 @@ Respond ONLY in valid JSON matching the schema.`;
       }
     });
 
-    const response = await model.generateContent(prompt);
-    const resultText = response.response.text();
+    const resultText = response.text;
     return JSON.parse(resultText);
   } catch (err) {
     console.error('[GEMINI ERROR]', err.message || err);
