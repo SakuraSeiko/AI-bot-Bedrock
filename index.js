@@ -36,6 +36,7 @@ function initBot() {
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
+  let isProcessing = false;
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
@@ -50,24 +51,34 @@ function initBot() {
 
   // Listen for incoming chat messages
   client.on('text', async (packet) => {
-    // Bedrock text packet types: 1 = chat, 2 = translation/system, 9 = raw JSON
-    const messageText = packet.message;
+    // Wyciągamy treść i nadawcę z różnych formatów pakietów Bedrocka
+    const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignore self messages
-    if (sourceName === 'Alice' || sourceName === client.username) return;
+    // Ignorujemy puste wiadomości oraz wiadomości wysłane przez samego bota
+    if (!messageText.trim() || sourceName.includes('Alice') || sourceName === client.username) return;
 
     console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
 
-    const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
-    if (!aiResult) return;
+    // Zabezpieczenie przed nakładaniem się kilku odpowiedzi Gemini na raz
+    if (isProcessing) return;
+    isProcessing = true;
 
-    if (aiResult.type === 'text' && aiResult.text) {
-      sendBedrockChat(client, aiResult.text.trim());
-    } else if (aiResult.type === 'function' && aiResult.action) {
-      if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-        sendBedrockChat(client, aiResult.action.args.message);
+    try {
+      const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
+      if (aiResult) {
+        if (aiResult.type === 'text' && aiResult.text) {
+          sendBedrockChat(client, aiResult.text.trim());
+        } else if (aiResult.type === 'function' && aiResult.action) {
+          if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
+            sendBedrockChat(client, aiResult.action.args.message);
+          }
+        }
       }
+    } catch (err) {
+      console.error('[GEMINI ERROR]', err.message || err);
+    } finally {
+      isProcessing = false;
     }
   });
 
@@ -82,13 +93,19 @@ function initBot() {
 }
 
 function sendBedrockChat(client, message) {
-  client.queue('text', {
-    type: 'chat',
-    needs_translation: false,
-    source_name: client.username,
-    xuid: '',
-    platform_chat_id: '',
-    message: message
-  });
-  console.log(`[BOT SENT] ${message}`);
+  try {
+    client.queue('text', {
+      type: 'chat',
+      needs_translation: false,
+      source_name: client.username,
+      message: message,
+      params: [client.username, message],
+      filtered_message: '',
+      xuid: '',
+      platform_chat_id: ''
+    });
+    console.log(`[BOT SENT] ${message}`);
+  } catch (err) {
+    console.error('[CHAT ERROR]', err.message || err);
+  }
 }
