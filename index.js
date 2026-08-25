@@ -37,9 +37,13 @@ function initBot() {
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
+  let isProcessing = false;
 
   // Finalize handshake to fully spawn into the Bedrock world as an active player
   client.on('start_game', (packet) => {
+    if (packet.player_position) {
+      botPosition = packet.player_position;
+    }
     client.queue('set_local_player_as_initialized', {
       runtime_entity_id: packet.runtime_entity_id
     });
@@ -67,15 +71,24 @@ function initBot() {
 
     console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
 
-    const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
-    if (!aiResult) return;
+    if (isProcessing) return;
+    isProcessing = true;
 
-    if (aiResult.type === 'text' && aiResult.text) {
-      sendBedrockChat(client, aiResult.text.trim());
-    } else if (aiResult.type === 'function' && aiResult.action) {
-      if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-        sendBedrockChat(client, aiResult.action.args.message);
+    try {
+      const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
+      if (aiResult) {
+        if (aiResult.type === 'text' && aiResult.text) {
+          sendBedrockChat(client, aiResult.text.trim());
+        } else if (aiResult.type === 'function' && aiResult.action) {
+          if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
+            sendBedrockChat(client, aiResult.action.args.message);
+          }
+        }
       }
+    } catch (err) {
+      console.error('[GEMINI ERROR]', err.message || err);
+    } finally {
+      isProcessing = false;
     }
   });
 
@@ -90,13 +103,17 @@ function initBot() {
 }
 
 function sendBedrockChat(client, message) {
-  client.queue('text', {
-    type: 'chat',
-    needs_translation: false,
-    source_name: client.username,
-    xuid: '',
-    platform_chat_id: '',
-    message: message
-  });
-  console.log(`[BOT SENT] ${message}`);
+  try {
+    client.queue('text', {
+      type: 'chat',
+      needs_translation: false,
+      source_name: client.username,
+      xuid: '',
+      platform_chat_id: '',
+      message: message
+    });
+    console.log(`[BOT SENT] ${message}`);
+  } catch (err) {
+    console.error('[CHAT ERROR]', err.message || err);
+  }
 }
