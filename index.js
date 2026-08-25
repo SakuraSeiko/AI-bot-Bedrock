@@ -23,8 +23,8 @@ function initBot() {
   }
 
   // Set host and port for your Bedrock server
-  const host = process.env.BEDROCK_HOST || 'EsnaSeiko.aternos.me';
-  const port = parseInt(process.env.BEDROCK_PORT || '51316', 10);
+  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
+  const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
 
