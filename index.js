@@ -51,16 +51,16 @@ function initBot() {
 
   // Listen for incoming chat messages
   client.on('text', async (packet) => {
-    // Wyciągamy treść i nadawcę z różnych formatów pakietów Bedrocka
+    // Extract message content and sender name from Bedrock packet formats
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignorujemy puste wiadomości oraz wiadomości wysłane przez samego bota
+    // Ignore empty messages or messages sent by the bot itself
     if (!messageText.trim() || sourceName.includes('Alice') || sourceName === client.username) return;
 
     console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
 
-    // Zabezpieczenie przed nakładaniem się kilku odpowiedzi Gemini na raz
+    // Prevent concurrent Gemini processing
     if (isProcessing) return;
     isProcessing = true;
 
@@ -99,8 +99,6 @@ function sendBedrockChat(client, message) {
       needs_translation: false,
       source_name: client.username,
       message: message,
-      params: [client.username, message],
-      filtered_message: '',
       xuid: '',
       platform_chat_id: ''
     });
