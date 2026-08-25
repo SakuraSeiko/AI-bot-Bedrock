@@ -37,7 +37,7 @@ function initBot() {
     skipPing: true,
     followPort: false,
     raknetBackend: 'jsp-raknet',
-    connectTimeout: 120000 // 2 minutes timeout to handle slow UDP handshakes
+    connectTimeout: 15000 // Skrócony timeout, by natychmiast wychwycić brak odpowiedzi
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
