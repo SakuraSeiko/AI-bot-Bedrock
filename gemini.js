@@ -23,7 +23,7 @@ Decide whether to reply with text or perform an action.
 Respond ONLY in valid JSON matching the schema.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
