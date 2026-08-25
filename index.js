@@ -38,8 +38,16 @@ function initBot() {
 
   let botPosition = { x: 0, y: 0, z: 0 };
 
-  client.on('join', () => {
-    console.log('[BOT] Alice successfully joined the Bedrock world!');
+  // Finalize handshake to fully spawn into the Bedrock world as an active player
+  client.on('start_game', (packet) => {
+    client.queue('set_local_player_as_initialized', {
+      runtime_entity_id: packet.runtime_entity_id
+    });
+    console.log('[BOT] Sent player initialization packet to server.');
+  });
+
+  client.on('spawn', () => {
+    console.log('[BOT] Alice fully spawned into the Bedrock world!');
   });
 
   // Track player coordinates from Bedrock packets
@@ -51,12 +59,11 @@ function initBot() {
 
   // Listen for incoming chat messages
   client.on('text', async (packet) => {
-    // Bedrock text packet types: 1 = chat, 2 = translation/system, 9 = raw JSON
     const messageText = packet.message;
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignore self messages
-    if (sourceName === 'Alice' || sourceName === client.username) return;
+    // Ignore empty messages or self messages
+    if (!messageText || sourceName === 'Alice' || sourceName === client.username) return;
 
     console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
 
