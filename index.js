@@ -4,7 +4,6 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// HTTP server required for Render uptime checks
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -22,7 +21,6 @@ function initBot() {
     return;
   }
 
-  // Set host and port for your Bedrock server
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
@@ -34,14 +32,14 @@ function initBot() {
     username: 'Alice',
     offline: true,
     version: '1.26.40',
-    connectTimeout: 45000, // Zwiększony czas na połączenie do 45 sekund dla lagów na Renderze
-    skipPing: true         // Pomija wstępny ping UDP, który blokuje połączenie
+    skipPing: false,               // Przywracamy ping, aby wymusić natychmiastowe wysłanie unkompressed RakNet handshake
+    connectTimeout: 10000,          // Krótki timeout (10s), by od razu ponawiać próbę przy gubieniu pakietów
+    concurrency: 1
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
   let isProcessing = false;
 
-  // Finalize handshake to fully spawn into the Bedrock world as an active player
   client.on('start_game', (packet) => {
     if (packet.player_position) {
       botPosition = packet.player_position;
@@ -56,19 +54,16 @@ function initBot() {
     console.log('[BOT] Alice fully spawned into the Bedrock world!');
   });
 
-  // Track player coordinates from Bedrock packets
   client.on('move_player', (packet) => {
     if (packet.runtime_id === client.entityId) {
       botPosition = packet.position;
     }
   });
 
-  // Listen for incoming chat messages
   client.on('text', async (packet) => {
     const messageText = packet.message;
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignore empty messages or self messages
     if (!messageText || sourceName === 'Alice' || sourceName === client.username) return;
 
     console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
@@ -99,8 +94,8 @@ function initBot() {
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 10 seconds...');
-    setTimeout(initBot, 10000);
+    console.log('[BOT] Connection closed. Reconnecting in 3 seconds...');
+    setTimeout(initBot, 3000); // Szybki auto-reconnect po 3 sekundach
   });
 }
 
