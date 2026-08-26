@@ -1,5 +1,4 @@
 const http = require('http');
-const dns = require('dns');
 const bedrock = require('bedrock-protocol');
 const { initGemini, analyzeMessage } = require('./gemini');
 
@@ -13,43 +12,27 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`[SYSTEM] Web server listening on port ${PORT}`);
   initGemini();
-  resolveAndStart();
+  initBot();
 });
 
-function resolveAndStart() {
-  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
-  
-  dns.lookup(host, (err, address) => {
-    if (err) {
-      console.error(`[DNS ERROR] Nie udalo sie pobrac IP dla ${host}:`, err.message);
-      initBot(host);
-    } else {
-      console.log(`[DNS SUCCESS] Domena ${host} wskazuje na IP: ${address}`);
-      initBot(address);
-    }
-  });
-}
-
-function initBot(targetHost) {
+function initBot() {
   if (!process.env.GEMINI_API_KEY) {
     console.error('[ERROR] GEMINI_API_KEY environment variable is missing!');
     return;
   }
 
+  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
-  console.log(`[BOT] Connecting to Bedrock server ${targetHost}:${port}...`);
+  console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
 
   const client = bedrock.createClient({
-    host: targetHost,
+    host: host,
     port: port,
     username: 'Alice',
     offline: true,
     version: '1.26.40',
-    skipPing: true,
-    followPort: false,
-    raknetBackend: 'raknet-native',
-    connectTimeout: 20000
+    connectTimeout: 30000
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
@@ -100,7 +83,7 @@ function initBot(targetHost) {
 
   client.on('close', () => {
     console.log('[BOT] Connection closed. Reconnecting in 20 seconds...');
-    setTimeout(resolveAndStart, 20000);
+    setTimeout(initBot, 20000);
   });
 }
 
