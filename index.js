@@ -5,7 +5,6 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// HTTP server required for Render uptime checks
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -20,14 +19,13 @@ server.listen(PORT, () => {
 function resolveAndStart() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   
-  // Automatyczne sprawdzenie numeru IP bezpośrednio w Node.js
   dns.lookup(host, (err, address) => {
     if (err) {
       console.error(`[DNS ERROR] Nie udalo sie pobrac IP dla ${host}:`, err.message);
-      initBot(host); // Proba polaczenia po domenie w razie bledu
+      initBot(host);
     } else {
       console.log(`[DNS SUCCESS] Domena ${host} wskazuje na IP: ${address}`);
-      initBot(address); // Przekazanie czystego IP do bota
+      initBot(address);
     }
   });
 }
@@ -39,7 +37,6 @@ function initBot(targetHost) {
   }
 
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
-
   console.log(`[BOT] Connecting to Bedrock server ${targetHost}:${port}...`);
 
   const client = bedrock.createClient({
@@ -56,9 +53,32 @@ function initBot(targetHost) {
 
   let botPosition = { x: 0, y: 0, z: 0 };
   let isProcessing = false;
+  let keepAliveInterval = null;
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
+
+    // Pętla podtrzymująca połączenie z Aternosem (zapobiega wywalaniu za bezczynność)
+    keepAliveInterval = setInterval(() => {
+      try {
+        client.queue('player_auth_input', {
+          position: botPosition,
+          pitch: 0,
+          yaw: 0,
+          head_yaw: 0,
+          move_vector: { x: 0, z: 0 },
+          input_data: 0,
+          input_mode: 0,
+          play_mode: 0,
+          interaction_model: 0,
+          gaze: null,
+          tick: 0,
+          delta: 0
+        });
+      } catch (e) {
+        // Ignoruj błędy jeśli rozłączona
+      }
+    }, 1000);
   });
 
   client.on('move_player', (packet) => {
@@ -68,6 +88,9 @@ function initBot(targetHost) {
   });
 
   client.on('text', async (packet) => {
+    // Ignoruj wiadomości systemowe i wiadomości własne bota
+    if (packet.type !== 'chat' && packet.type !== 'translation') return;
+
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
@@ -102,22 +125,25 @@ function initBot(targetHost) {
 
   client.on('close', () => {
     console.log('[BOT] Connection closed. Reconnecting in 10 seconds...');
+    if (keepAliveInterval) clearInterval(keepAliveInterval);
     setTimeout(resolveAndStart, 10000);
   });
 }
 
 function sendBedrockChat(client, message) {
   try {
-    client.queue('text', {
-      type: 'chat',
-      needs_translation: false,
-      source_name: client.username,
-      message: message,
-      xuid: '',
-      platform_chat_id: '',
-      filtered_message: ''
+    // Użycie komendy command_request omija błędy parsera czatu klientowskiego na serwerach Bedrock
+    client.queue('command_request', {
+      command: `/say ${message}`,
+      origin: {
+        type: 0,
+        uuid: '',
+        request_id: ''
+      },
+      internal: false,
+      version: 57
     });
-    console.log(`[BOT SENT] ${message}`);
+    console.log(`[BOT SENT VIA CMD] ${message}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
