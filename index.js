@@ -48,7 +48,7 @@ function initBot(targetHost) {
     version: '1.26.40',
     skipPing: true,
     followPort: false,
-    raknetBackend: 'js', // Wymuszenie czystego JS zapobiega blokowaniu gniazda UDP
+    raknetBackend: 'raknet-native',
     connectTimeout: 20000
   });
 
@@ -100,10 +100,7 @@ function initBot(targetHost) {
 
   client.on('close', () => {
     console.log('[BOT] Connection closed. Reconnecting in 20 seconds...');
-    try {
-      client.close();
-    } catch (e) {}
-    setTimeout(resolveAndStart, 20000); // 20 sekund przerwy daje czas Aternosowi na reset sesji
+    setTimeout(resolveAndStart, 20000);
   });
 }
 
