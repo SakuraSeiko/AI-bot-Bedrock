@@ -32,6 +32,7 @@ function initBot() {
     username: 'Alice',
     offline: true,
     version: '1.26.40',
+    skipPing: true,
     connectTimeout: 30000
   });
 
