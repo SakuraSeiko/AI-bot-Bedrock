@@ -114,7 +114,8 @@ function sendBedrockChat(client, message) {
       source_name: client.username,
       message: message,
       xuid: '',
-      platform_chat_id: ''
+      platform_chat_id: '',
+      filtered_message: ''
     });
     console.log(`[BOT SENT] ${message}`);
   } catch (err) {
