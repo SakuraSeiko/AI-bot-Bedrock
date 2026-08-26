@@ -5,6 +5,7 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
+// HTTP server required for Render uptime checks
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -19,13 +20,14 @@ server.listen(PORT, () => {
 function resolveAndStart() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   
+  // Automatyczne sprawdzenie numeru IP bezpośrednio w Node.js
   dns.lookup(host, (err, address) => {
     if (err) {
       console.error(`[DNS ERROR] Nie udalo sie pobrac IP dla ${host}:`, err.message);
-      initBot(host);
+      initBot(host); // Proba polaczenia po domenie w razie bledu
     } else {
       console.log(`[DNS SUCCESS] Domena ${host} wskazuje na IP: ${address}`);
-      initBot(address);
+      initBot(address); // Przekazanie czystego IP do bota
     }
   });
 }
@@ -37,6 +39,7 @@ function initBot(targetHost) {
   }
 
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
+
   console.log(`[BOT] Connecting to Bedrock server ${targetHost}:${port}...`);
 
   const client = bedrock.createClient({
@@ -111,7 +114,8 @@ function sendBedrockChat(client, message) {
       source_name: client.username,
       message: message,
       xuid: '',
-      platform_chat_id: ''
+      platform_chat_id: '',
+      filtered_message: ''
     });
     console.log(`[BOT SENT] ${message}`);
   } catch (err) {
