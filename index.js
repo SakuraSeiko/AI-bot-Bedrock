@@ -5,7 +5,6 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// HTTP server required for Render uptime checks
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -20,14 +19,13 @@ server.listen(PORT, () => {
 function resolveAndStart() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   
-  // Automatyczne sprawdzenie numeru IP bezpośrednio w Node.js
   dns.lookup(host, (err, address) => {
     if (err) {
       console.error(`[DNS ERROR] Nie udalo sie pobrac IP dla ${host}:`, err.message);
-      initBot(host); // Proba polaczenia po domenie w razie bledu
+      initBot(host);
     } else {
       console.log(`[DNS SUCCESS] Domena ${host} wskazuje na IP: ${address}`);
-      initBot(address); // Przekazanie czystego IP do bota
+      initBot(address);
     }
   });
 }
@@ -50,8 +48,8 @@ function initBot(targetHost) {
     version: '1.26.40',
     skipPing: true,
     followPort: false,
-    raknetBackend: 'raknet-native',
-    connectTimeout: 15000
+    raknetBackend: 'js', // Wymuszenie czystego JS zapobiega blokowaniu gniazda UDP
+    connectTimeout: 20000
   });
 
   let botPosition = { x: 0, y: 0, z: 0 };
@@ -101,8 +99,11 @@ function initBot(targetHost) {
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 10 seconds...');
-    setTimeout(resolveAndStart, 10000);
+    console.log('[BOT] Connection closed. Reconnecting in 20 seconds...');
+    try {
+      client.close();
+    } catch (e) {}
+    setTimeout(resolveAndStart, 20000); // 20 sekund przerwy daje czas Aternosowi na reset sesji
   });
 }
 
