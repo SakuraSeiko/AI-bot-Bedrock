@@ -50,7 +50,7 @@ function initBot(targetHost) {
     version: '1.26.40',
     skipPing: true,
     followPort: false,
-    raknetBackend: 'jsp-raknet',
+    raknetBackend: 'raknet-native',
     connectTimeout: 15000
   });
 
