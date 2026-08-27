@@ -51,21 +51,22 @@ function initBot() {
 
   client.on('text', async (packet) => {
     const messageText = packet.message || packet.param2 || '';
-    const sourceName = packet.source_name || packet.param1 || 'Player';
+    const sourceName = packet.source_name || packet.param1 || '';
 
-    // Rygorystyczne filtrowanie: ignoruj puste, własne, systemowe oraz komunikaty od "Player"
+    // Logujemy każdy odebrany pakiet czatu do konsoli Rendera
+    console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
+
+    // Odfiltrowujemy puste pakiety, wiadomości od samej Alice oraz wiadomości systemowe (%)
     if (
       !messageText.trim() || 
-      sourceName.includes('Alice') || 
       sourceName === client.username || 
-      sourceName === 'Player' ||
-      messageText.includes('%') ||
-      messageText.startsWith('$')
+      sourceName.includes('Alice') ||
+      messageText.includes('%')
     ) {
       return;
     }
 
-    console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
+    console.log(`[PROCESSING CHAT] ${sourceName}: ${messageText}`);
 
     if (isProcessing) return;
     isProcessing = true;
@@ -103,19 +104,18 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
-    // Wysyłanie jako komenda interakcji ze światem zamiast niestabilnego pakietu czatu
-    client.queue('command_request', {
-      command: `/me ${cleanMessage}`,
-      origin: {
-        type: 0,
-        uuid: '',
-        request_id: '',
-        player_entity_id: 0
-      },
-      internal: false,
-      version: 66
+    // Wysyłanie pakietu czatu wzorowane na oficjalnym przykładowym kodzie GitHub
+    client.queue('text', {
+      type: 'chat',
+      needs_translation: false,
+      source_name: client.username,
+      xuid: '',
+      platform_chat_id: '',
+      filtered_message: '',
+      message: cleanMessage
     });
-    console.log(`[BOT SENT CMD] ${cleanMessage}`);
+
+    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
