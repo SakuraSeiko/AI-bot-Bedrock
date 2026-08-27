@@ -103,16 +103,19 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
-    client.queue('text', {
-      type: 'chat',
-      needs_translation: false,
-      source_name: client.username,
-      message: cleanMessage,
-      xuid: '',
-      platform_chat_id: '',
-      filtered_message: ''
+    // Wysyłanie jako komenda interakcji ze światem zamiast niestabilnego pakietu czatu
+    client.queue('command_request', {
+      command: `/me ${cleanMessage}`,
+      origin: {
+        type: 0,
+        uuid: '',
+        request_id: '',
+        player_entity_id: 0
+      },
+      internal: false,
+      version: 66
     });
-    console.log(`[BOT SENT] ${cleanMessage}`);
+    console.log(`[BOT SENT CMD] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
