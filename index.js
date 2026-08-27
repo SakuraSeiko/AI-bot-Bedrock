@@ -53,13 +53,14 @@ function initBot() {
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignoruj puste wiadomości, własne wiadomości oraz komunikaty systemowe
+    // Rygorystyczne filtrowanie: ignoruj puste, własne, systemowe oraz komunikaty od "Player"
     if (
       !messageText.trim() || 
       sourceName.includes('Alice') || 
       sourceName === client.username || 
-      messageText.startsWith('%') || 
-      messageText.startsWith('$%')
+      sourceName === 'Player' ||
+      messageText.includes('%') ||
+      messageText.startsWith('$')
     ) {
       return;
     }
@@ -103,13 +104,13 @@ function sendBedrockChat(client, message) {
     if (!cleanMessage) return;
 
     client.queue('text', {
-      type: 'raw',
+      type: 'chat',
       needs_translation: false,
-      source_name: '',
-      message: JSON.stringify({ rawtext: [{ text: `<Alice> ${cleanMessage}` }] }),
-      filtered_message: '',
+      source_name: client.username,
+      message: cleanMessage,
       xuid: '',
-      platform_chat_id: ''
+      platform_chat_id: '',
+      filtered_message: ''
     });
     console.log(`[BOT SENT] ${cleanMessage}`);
   } catch (err) {
