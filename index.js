@@ -4,8 +4,8 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// Flaga dynamicznego pingu: pierwsza próba = false, po błędzie/reconnect = true
 let shouldSkipPing = false;
+let reconnectTimer = null;
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -17,6 +17,18 @@ server.listen(PORT, () => {
   initGemini();
   initBot();
 });
+
+function scheduleReconnect() {
+  if (reconnectTimer) return; // Zapobiega nakładaniu się wielu reconnectów
+  
+  shouldSkipPing = true; // Następna próba zawsze omija ping
+  console.log('[BOT] Scheduling reconnect in 5 seconds (with skipPing=true)...');
+  
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    initBot();
+  }, 5000);
+}
 
 function initBot() {
   if (!process.env.GEMINI_API_KEY) {
@@ -44,7 +56,6 @@ function initBot() {
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
-    // Po udanym wejściu resetujemy flagę, by przy kolejnym pełnym restarcie zacząć od pingowania
     shouldSkipPing = false;
   });
 
@@ -93,14 +104,12 @@ function initBot() {
 
   client.on('error', (err) => {
     console.error('[BOT ERROR]', err.message || err);
-    // W razie błędu przy przełączaniu, upewnij się że następna próba minie ping
-    shouldSkipPing = true;
+    scheduleReconnect();
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Setting skipPing=true for reconnect in 20s...');
-    shouldSkipPing = true;
-    setTimeout(initBot, 20000);
+    console.log('[BOT] Connection closed.');
+    scheduleReconnect();
   });
 }
 
