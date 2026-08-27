@@ -94,8 +94,8 @@ function initBot() {
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 20 seconds...');
-    setTimeout(initBot, 20000);
+    console.log('[BOT] Connection closed. Reconnecting in 10 seconds...');
+    setTimeout(initBot, 10000);
   });
 }
 
