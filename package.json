@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@google/genai": "latest",
-    "bedrock-protocol": "latest"
+    "bedrock-protocol": "3.58.3"
   }
 }
