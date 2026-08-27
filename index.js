@@ -4,6 +4,7 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
+// Serwer HTTP działa całkowicie niezależnie od bota
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -53,6 +54,7 @@ function initBot() {
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as Alice...`);
 
+  // Bezpieczne czyszczenie poprzedniej instancji klienta
   if (currentClient) {
     try {
       currentClient.removeAllListeners();
@@ -140,10 +142,11 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
+    // source_name wysyłamy puste (''), aby Aternos nie odrzucał pakietu jako próby spoofingu
     client.queue('text', {
       type: 'chat',
       needs_translation: false,
-      source_name: client.username,
+      source_name: '',
       xuid: '',
       platform_chat_id: '',
       filtered_message: '',
@@ -156,6 +159,7 @@ function sendBedrockChat(client, message) {
   }
 }
 
+// Zabezpieczenie przed niewyłapanymi błędami Node.js
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err.message || err);
   scheduleReconnect();
