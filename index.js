@@ -4,6 +4,9 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
+// Flaga dynamicznego pingu: pierwsza próba = false, po błędzie/reconnect = true
+let shouldSkipPing = false;
+
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -24,7 +27,7 @@ function initBot() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
-  console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
+  console.log(`[BOT] Connecting to Bedrock server ${host}:${port} (skipPing: ${shouldSkipPing})...`);
 
   const client = bedrock.createClient({
     host: host,
@@ -32,7 +35,7 @@ function initBot() {
     username: 'Alice',
     offline: true,
     version: '1.26.40',
-    skipPing: true,
+    skipPing: shouldSkipPing,
     connectTimeout: 30000
   });
 
@@ -41,6 +44,8 @@ function initBot() {
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
+    // Po udanym wejściu resetujemy flagę, by przy kolejnym pełnym restarcie zacząć od pingowania
+    shouldSkipPing = false;
   });
 
   client.on('move_player', (packet) => {
@@ -53,7 +58,6 @@ function initBot() {
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignoruj puste wiadomości, własne wiadomości oraz komunikaty systemowe gier
     if (
       !messageText.trim() || 
       sourceName.includes('Alice') || 
@@ -89,10 +93,13 @@ function initBot() {
 
   client.on('error', (err) => {
     console.error('[BOT ERROR]', err.message || err);
+    // W razie błędu przy przełączaniu, upewnij się że następna próba minie ping
+    shouldSkipPing = true;
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 20 seconds...');
+    console.log('[BOT] Connection closed. Setting skipPing=true for reconnect in 20s...');
+    shouldSkipPing = true;
     setTimeout(initBot, 20000);
   });
 }
