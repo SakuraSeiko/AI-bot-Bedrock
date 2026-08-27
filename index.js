@@ -52,7 +52,11 @@ function initBot() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
-  console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
+  // TYMCZASOWO: Losowy sufiks nicku do testu zawieszonych sesji Aternosa
+  const randomSuffix = Math.floor(Math.random() * 1000);
+  const botUsername = `Alice_${randomSuffix}`;
+
+  console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as ${botUsername}...`);
 
   // Bezpieczne czyszczenie starego klienta
   if (currentClient) {
@@ -66,7 +70,7 @@ function initBot() {
   const client = bedrock.createClient({
     host: host,
     port: port,
-    username: 'Alice',
+    username: botUsername,
     offline: true,
     version: '1.26.40',
     skipPing: true,
@@ -79,7 +83,7 @@ function initBot() {
   let isProcessing = false;
 
   client.on('join', () => {
-    console.log('[BOT] Alice successfully joined the Bedrock world!');
+    console.log(`[BOT] ${botUsername} successfully joined the Bedrock world!`);
   });
 
   client.on('move_player', (packet) => {
@@ -158,7 +162,7 @@ function sendBedrockChat(client, message) {
   }
 }
 
-// Zabezpieczenie przed niewyłapanymi bólami Node.js, żeby Render NIE wyłączał aplikacji
+// Zabezpieczenie przed niewyłapanymi błędami Node.js
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err.message || err);
   scheduleReconnect();
