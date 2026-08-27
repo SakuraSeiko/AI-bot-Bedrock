@@ -4,8 +4,8 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-let shouldSkipPing = false;
 let reconnectTimer = null;
+let activeClient = null;
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -18,16 +18,19 @@ server.listen(PORT, () => {
   initBot();
 });
 
-function scheduleReconnect() {
-  if (reconnectTimer) return; // Zapobiega nakładaniu się wielu reconnectów
+function scheduleReconnect(delay = 3000) {
+  if (reconnectTimer) return;
   
-  shouldSkipPing = true; // Następna próba zawsze omija ping
-  console.log('[BOT] Scheduling reconnect in 5 seconds (with skipPing=true)...');
-  
+  if (activeClient) {
+    try { activeClient.close(); } catch (e) {}
+    activeClient = null;
+  }
+
+  console.log(`[BOT] Retrying connection in ${delay / 1000}s...`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     initBot();
-  }, 5000);
+  }, delay);
 }
 
 function initBot() {
@@ -39,78 +42,85 @@ function initBot() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
-  console.log(`[BOT] Connecting to Bedrock server ${host}:${port} (skipPing: ${shouldSkipPing})...`);
+  console.log(`[BOT] Connecting to ${host}:${port}...`);
 
-  const client = bedrock.createClient({
-    host: host,
-    port: port,
-    username: 'Alice',
-    offline: true,
-    version: '1.26.40',
-    skipPing: shouldSkipPing,
-    connectTimeout: 30000
-  });
+  try {
+    const client = bedrock.createClient({
+      host: host,
+      port: port,
+      username: 'Alice',
+      offline: true,
+      version: '1.26.40',
+      skipPing: true,
+      connectTimeout: 8000 // Krótki timeout: jeśli nie przejdzie w 8s, próbujemy z nowym socketem
+    });
 
-  let botPosition = { x: 0, y: 0, z: 0 };
-  let isProcessing = false;
+    activeClient = client;
 
-  client.on('join', () => {
-    console.log('[BOT] Alice successfully joined the Bedrock world!');
-    shouldSkipPing = false;
-  });
+    let botPosition = { x: 0, y: 0, z: 0 };
+    let isProcessing = false;
 
-  client.on('move_player', (packet) => {
-    if (packet.runtime_id === client.entityId) {
-      botPosition = packet.position;
-    }
-  });
+    client.on('join', () => {
+      console.log('[BOT] Alice successfully joined the Bedrock world!');
+    });
 
-  client.on('text', async (packet) => {
-    const messageText = packet.message || packet.param2 || '';
-    const sourceName = packet.source_name || packet.param1 || 'Player';
+    client.on('move_player', (packet) => {
+      if (packet.runtime_id === client.entityId) {
+        botPosition = packet.position;
+      }
+    });
 
-    if (
-      !messageText.trim() || 
-      sourceName.includes('Alice') || 
-      sourceName === client.username || 
-      messageText.startsWith('%') || 
-      messageText.startsWith('$%')
-    ) {
-      return;
-    }
+    client.on('text', async (packet) => {
+      const messageText = packet.message || packet.param2 || '';
+      const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
+      if (
+        !messageText.trim() || 
+        sourceName.includes('Alice') || 
+        sourceName === client.username || 
+        messageText.startsWith('%') || 
+        messageText.startsWith('$%')
+      ) {
+        return;
+      }
 
-    if (isProcessing) return;
-    isProcessing = true;
+      console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
 
-    try {
-      const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
-      if (aiResult) {
-        if (aiResult.type === 'text' && aiResult.text) {
-          sendBedrockChat(client, aiResult.text.trim());
-        } else if (aiResult.type === 'function' && aiResult.action) {
-          if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-            sendBedrockChat(client, aiResult.action.args.message);
+      if (isProcessing) return;
+      isProcessing = true;
+
+      try {
+        const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
+        if (aiResult) {
+          if (aiResult.type === 'text' && aiResult.text) {
+            sendBedrockChat(client, aiResult.text.trim());
+          } else if (aiResult.type === 'function' && aiResult.action) {
+            if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
+              sendBedrockChat(client, aiResult.action.args.message);
+            }
           }
         }
+      } catch (err) {
+        console.error('[GEMINI ERROR]', err.message || err);
+      } finally {
+        isProcessing = false;
       }
-    } catch (err) {
-      console.error('[GEMINI ERROR]', err.message || err);
-    } finally {
-      isProcessing = false;
-    }
-  });
+    });
 
-  client.on('error', (err) => {
-    console.error('[BOT ERROR]', err.message || err);
-    scheduleReconnect();
-  });
+    client.on('error', (err) => {
+      console.error('[BOT ERROR]', err.message || err);
+      scheduleReconnect(3000);
+    });
 
-  client.on('close', () => {
-    console.log('[BOT] Connection closed.');
-    scheduleReconnect();
-  });
+    client.on('close', () => {
+      console.log('[BOT] Connection closed.');
+      scheduleReconnect(3000);
+    });
+
+  } catch (err) {
+    console.error('[INIT ERROR]', err.message || err);
+    scheduleReconnect(5000);
+  }
 }
 
 function sendBedrockChat(client, message) {
