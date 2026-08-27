@@ -1,11 +1,8 @@
 const bedrock = require('bedrock-protocol');
-const { GoogleGenAI } = require('@google/genai');
+const { getGeminiResponse } = require('./gemini');
 
 const host = process.env.MC_HOST;
 const port = parseInt(process.env.MC_PORT, 10);
-const geminiApiKey = process.env.GEMINI_API_KEY;
-
-const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
 let botPosition = { x: 0, y: 0, z: 0 };
 
@@ -65,23 +62,9 @@ function initBot() {
 
     console.log(`[CHAT] ${sender}: ${message}`);
 
-    try {
-      const prompt = `Jesteś botem w Minecraft Bedrock o imieniu Alice. 
-Aktualna pozycja w grze: X=${botPosition.x}, Y=${botPosition.y}, Z=${botPosition.z}.
-Gracz ${sender} napisał: "${message}".
-Odpowiedz zwięźle i naturalnie (1-2 zdania), dostosowując się do realiów gry. Nie używaj formatowania Markdown.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt
-      });
-
-      const replyText = response.text;
-      if (replyText) {
-        sendBedrockChat(client, replyText);
-      }
-    } catch (err) {
-      console.error('[GEMINI ERROR]', err.message || err);
+    const replyText = await getGeminiResponse(sender, message, botPosition);
+    if (replyText) {
+      sendBedrockChat(client, replyText);
     }
   });
 
