@@ -53,7 +53,7 @@ function initBot() {
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || 'Player';
 
-    // Ignoruj puste wiadomości, własne wiadomości oraz komunikaty systemowe gier (np. %multiplayer...)
+    // Ignoruj puste wiadomości, własne wiadomości oraz komunikaty systemowe gier
     if (
       !messageText.trim() || 
       sourceName.includes('Alice') || 
@@ -99,8 +99,15 @@ function initBot() {
 
 function sendBedrockChat(client, message) {
   try {
-    // Wygodna, bezpieczna metoda wysokiego poziomu z biblioteki bedrock-protocol
-    client.chat(message);
+    client.queue('text', {
+      type: 'chat',
+      needs_translation: false,
+      source_name: client.username,
+      message: message,
+      xuid: '',
+      platform_chat_id: '',
+      filtered_message: ''
+    });
     console.log(`[BOT SENT] ${message}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
