@@ -1,30 +1,36 @@
-const http = require('http');
 const bedrock = require('bedrock-protocol');
-const { initGemini, analyzeMessage } = require('./gemini');
+const { GoogleGenAI } = require('@google/genai');
 
-const PORT = process.env.PORT || 3000;
+const host = process.env.MC_HOST;
+const port = parseInt(process.env.MC_PORT, 10);
+const geminiApiKey = process.env.GEMINI_API_KEY;
 
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Alice Bedrock AI Bot Service is active.\n');
-});
+const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
-server.listen(PORT, () => {
-  console.log(`[SYSTEM] Web server listening on port ${PORT}`);
-  initGemini();
-  initBot();
-});
+let botPosition = { x: 0, y: 0, z: 0 };
+
+function sendBedrockChat(client, message) {
+  try {
+    const cleanMessage = String(message).trim();
+    if (!cleanMessage) return;
+
+    client.queue('text', {
+      type: 'chat',
+      needs_translation: false,
+      source_name: client.username,
+      message: cleanMessage,
+      filtered_message: '',
+      xuid: '',
+      platform_chat_id: ''
+    });
+    console.log(`[BOT SENT] ${cleanMessage}`);
+  } catch (err) {
+    console.error('[CHAT ERROR]', err.message || err);
+  }
+}
 
 function initBot() {
-  if (!process.env.GEMINI_API_KEY) {
-    console.error('[ERROR] GEMINI_API_KEY environment variable is missing!');
-    return;
-  }
-
-  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
-  const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
-
-  console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
+  console.log('[BOT] Łączenie z serwerem Bedrock...');
 
   const client = bedrock.createClient({
     host: host,
@@ -36,80 +42,57 @@ function initBot() {
     connectTimeout: 30000
   });
 
-  let botPosition = { x: 0, y: 0, z: 0 };
-  let isProcessing = false;
-
   client.on('join', () => {
-    console.log('[BOT] Alice successfully joined the Bedrock world!');
+    console.log('[BOT] Alice pomyślnie dołączyła do świata!');
   });
 
   client.on('move_player', (packet) => {
-    if (packet.runtime_id === client.entityId) {
-      botPosition = packet.position;
+    if (packet.runtime_id === client.entityId || packet.position) {
+      botPosition = {
+        x: Math.round(packet.position.x),
+        y: Math.round(packet.position.y),
+        z: Math.round(packet.position.z)
+      };
     }
   });
 
   client.on('text', async (packet) => {
-    const messageText = packet.message || packet.param2 || '';
-    const sourceName = packet.source_name || packet.param1 || 'Player';
+    const sender = packet.source_name;
+    const message = packet.message;
 
-    // Ignoruj puste wiadomości, własne wiadomości oraz komunikaty systemowe
-    if (
-      !messageText.trim() || 
-      sourceName.includes('Alice') || 
-      sourceName === client.username || 
-      messageText.startsWith('%') || 
-      messageText.startsWith('$%')
-    ) {
-      return;
-    }
+    if (!message || sender === client.username || sender === 'Alice') return;
+    if (message.startsWith('%')) return;
 
-    console.log(`[BEDROCK CHAT] ${sourceName}: ${messageText}`);
-
-    if (isProcessing) return;
-    isProcessing = true;
+    console.log(`[CHAT] ${sender}: ${message}`);
 
     try {
-      const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
-      if (aiResult) {
-        if (aiResult.type === 'text' && aiResult.text) {
-          sendBedrockChat(client, aiResult.text.trim());
-        } else if (aiResult.type === 'function' && aiResult.action) {
-          if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-            sendBedrockChat(client, aiResult.action.args.message);
-          }
-        }
+      const prompt = `Jesteś botem w Minecraft Bedrock o imieniu Alice. 
+Aktualna pozycja w grze: X=${botPosition.x}, Y=${botPosition.y}, Z=${botPosition.z}.
+Gracz ${sender} napisał: "${message}".
+Odpowiedz zwięźle i naturalnie (1-2 zdania), dostosowując się do realiów gry. Nie używaj formatowania Markdown.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt
+      });
+
+      const replyText = response.text;
+      if (replyText) {
+        sendBedrockChat(client, replyText);
       }
     } catch (err) {
       console.error('[GEMINI ERROR]', err.message || err);
-    } finally {
-      isProcessing = false;
     }
   });
 
   client.on('error', (err) => {
-    console.error('[BOT ERROR]', err.message || err);
+    console.error('[CLIENT ERROR]', err.message || err);
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 20 seconds...');
+    console.log('[BOT] Połączenie zamknięte. Ponawianie za 20 sekund...');
     setTimeout(initBot, 20000);
   });
 }
 
-function sendBedrockChat(client, message) {
-  try {
-    client.queue('text', {
-      type: 'chat',
-      needs_translation: false,
-      source_name: client.username,
-      message: message,
-      xuid: '',
-      platform_chat_id: '',
-      filtered_message: ''
-    });
-    console.log(`[BOT SENT] ${message}`);
-  } catch (err) {
-    console.error('[CHAT ERROR]', err.message || err);
-  }
-}
+initBot();
