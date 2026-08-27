@@ -4,7 +4,6 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// Serwer HTTP działa całkowicie niezależnie
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -52,13 +51,8 @@ function initBot() {
   const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
-  // TYMCZASOWO: Losowy sufiks nicku do testu zawieszonych sesji Aternosa
-  const randomSuffix = Math.floor(Math.random() * 1000);
-  const botUsername = `Alice_${randomSuffix}`;
+  console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as Alice...`);
 
-  console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as ${botUsername}...`);
-
-  // Bezpieczne czyszczenie starego klienta
   if (currentClient) {
     try {
       currentClient.removeAllListeners();
@@ -70,7 +64,7 @@ function initBot() {
   const client = bedrock.createClient({
     host: host,
     port: port,
-    username: botUsername,
+    username: 'Alice',
     offline: true,
     version: '1.26.40',
     skipPing: true,
@@ -83,7 +77,7 @@ function initBot() {
   let isProcessing = false;
 
   client.on('join', () => {
-    console.log(`[BOT] ${botUsername} successfully joined the Bedrock world!`);
+    console.log('[BOT] Alice successfully joined the Bedrock world!');
   });
 
   client.on('move_player', (packet) => {
@@ -162,7 +156,6 @@ function sendBedrockChat(client, message) {
   }
 }
 
-// Zabezpieczenie przed niewyłapanymi błędami Node.js
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err.message || err);
   scheduleReconnect();
