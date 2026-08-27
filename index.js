@@ -99,16 +99,19 @@ function initBot() {
 
 function sendBedrockChat(client, message) {
   try {
+    const cleanMessage = String(message).trim();
+    if (!cleanMessage) return;
+
     client.queue('text', {
-      type: 'chat',
+      type: 'raw',
       needs_translation: false,
-      source_name: client.username,
-      message: message,
+      source_name: '',
+      message: JSON.stringify({ rawtext: [{ text: `<Alice> ${cleanMessage}` }] }),
+      filtered_message: '',
       xuid: '',
-      platform_chat_id: '',
-      filtered_message: ''
+      platform_chat_id: ''
     });
-    console.log(`[BOT SENT] ${message}`);
+    console.log(`[BOT SENT] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
