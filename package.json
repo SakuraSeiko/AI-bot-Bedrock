@@ -7,7 +7,7 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "@google/genai": "latest",
+    "@google/genai": "2.19.0",
     "bedrock-protocol": "3.58.3"
   }
 }
