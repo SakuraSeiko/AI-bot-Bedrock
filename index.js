@@ -1,19 +1,4 @@
-const http = require('http');
-const bedrock = require('bedrock-protocol');
-const { initGemini, analyzeMessage } = require('./gemini');
-
-const PORT = process.env.PORT || 3000;
-
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Alice Bedrock AI Bot Service is active.\n');
-});
-
-server.listen(PORT, () => {
-  console.log(`[SYSTEM] Web server listening on port ${PORT}`);
-  initGemini();
-  initBot();
-});
+let client = null;
 
 function initBot() {
   if (!process.env.GEMINI_API_KEY) {
@@ -26,7 +11,7 @@ function initBot() {
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
 
-  const client = bedrock.createClient({
+  client = bedrock.createClient({
     host: host,
     port: port,
     username: 'Alice',
@@ -38,6 +23,23 @@ function initBot() {
 
   let botPosition = { x: 0, y: 0, z: 0 };
   let isProcessing = false;
+  let hasReconnected = false;
+
+  // Jednolita funkcja do ponawiania połączenia, zapobiegająca podwójnemu wywołaniu
+  const triggerReconnect = (reason) => {
+    if (hasReconnected) return;
+    hasReconnected = true;
+
+    console.log(`[BOT] ${reason}. Reconnecting in 10 seconds...`);
+    
+    if (client) {
+      try { client.close(); } catch (e) {}
+    }
+
+    setTimeout(() => {
+      initBot();
+    }, 10000);
+  };
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
@@ -53,10 +55,8 @@ function initBot() {
     const messageText = packet.message || packet.param2 || '';
     const sourceName = packet.source_name || packet.param1 || '';
 
-    // Logujemy każdy odebrany pakiet czatu do konsoli Rendera
     console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
 
-    // Odfiltrowujemy puste pakiety, wiadomości od samej Alice oraz wiadomości systemowe (%)
     if (
       !messageText.trim() || 
       sourceName === client.username || 
@@ -89,34 +89,13 @@ function initBot() {
     }
   });
 
+  // Reagujemy zarówno na błąd (w tym Connect timed out), jak i na zamknięcie gniazda
   client.on('error', (err) => {
     console.error('[BOT ERROR]', err.message || err);
+    triggerReconnect(`Error occurred (${err.message || err})`);
   });
 
   client.on('close', () => {
-    console.log('[BOT] Connection closed. Reconnecting in 5 seconds...');
-    setTimeout(initBot, 5000);
+    triggerReconnect('Connection closed');
   });
-}
-
-function sendBedrockChat(client, message) {
-  try {
-    const cleanMessage = String(message).trim();
-    if (!cleanMessage) return;
-
-    // Wysyłanie pakietu czatu wzorowane na oficjalnym przykładowym kodzie GitHub
-    client.queue('text', {
-      type: 'chat',
-      needs_translation: false,
-      source_name: client.username,
-      xuid: '',
-      platform_chat_id: '',
-      filtered_message: '',
-      message: cleanMessage
-    });
-
-    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
-  } catch (err) {
-    console.error('[CHAT ERROR]', err.message || err);
-  }
 }
