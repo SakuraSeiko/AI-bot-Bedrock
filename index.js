@@ -54,7 +54,6 @@ function initBot() {
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as Alice...`);
 
-  // Bezpieczne czyszczenie poprzedniej instancji klienta
   if (currentClient) {
     try {
       currentClient.removeAllListeners();
@@ -80,6 +79,11 @@ function initBot() {
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
+  });
+
+  // Nasłuchiwanie dokładnego powodu rozłączenia przez natywny serwer BDS
+  client.on('disconnect', (packet) => {
+    console.log('[BDS KICK REASON]', JSON.stringify(packet));
   });
 
   client.on('move_player', (packet) => {
@@ -142,11 +146,10 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
-    // source_name wysyłamy puste (''), aby Aternos nie odrzucał pakietu jako próby spoofingu
     client.queue('text', {
       type: 'chat',
       needs_translation: false,
-      source_name: '',
+      source_name: client.username,
       xuid: '',
       platform_chat_id: '',
       filtered_message: '',
@@ -159,7 +162,6 @@ function sendBedrockChat(client, message) {
   }
 }
 
-// Zabezpieczenie przed niewyłapanymi błędami Node.js
 process.on('uncaughtException', (err) => {
   console.error('[UNCAUGHT EXCEPTION]', err.message || err);
   scheduleReconnect();
