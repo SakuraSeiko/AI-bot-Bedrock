@@ -1,4 +1,47 @@
-let client = null;
+const http = require('http');
+const bedrock = require('bedrock-protocol');
+const { initGemini, analyzeMessage } = require('./gemini');
+
+const PORT = process.env.PORT || 3000;
+
+// Serwer HTTP działa całkowicie niezależnie
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Alice Bedrock AI Bot Service is active.\n');
+});
+
+server.listen(PORT, () => {
+  console.log(`[SYSTEM] Web server listening on port ${PORT}`);
+  try {
+    initGemini();
+  } catch (e) {
+    console.error('[GEMINI INIT ERROR]', e);
+  }
+  startBotSafely();
+});
+
+let currentClient = null;
+let reconnectTimer = null;
+
+function startBotSafely() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  
+  try {
+    initBot();
+  } catch (err) {
+    console.error('[CRITICAL BOT LAUNCH ERROR]', err.message || err);
+    scheduleReconnect();
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  console.log('[BOT] Scheduling reconnect in 10 seconds...');
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    startBotSafely();
+  }, 10000);
+}
 
 function initBot() {
   if (!process.env.GEMINI_API_KEY) {
@@ -11,7 +54,16 @@ function initBot() {
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port}...`);
 
-  client = bedrock.createClient({
+  // Bezpieczne czyszczenie starego klienta
+  if (currentClient) {
+    try {
+      currentClient.removeAllListeners();
+      currentClient.close();
+    } catch (e) {}
+    currentClient = null;
+  }
+
+  const client = bedrock.createClient({
     host: host,
     port: port,
     username: 'Alice',
@@ -21,25 +73,10 @@ function initBot() {
     connectTimeout: 30000
   });
 
+  currentClient = client;
+
   let botPosition = { x: 0, y: 0, z: 0 };
   let isProcessing = false;
-  let hasReconnected = false;
-
-  // Jednolita funkcja do ponawiania połączenia, zapobiegająca podwójnemu wywołaniu
-  const triggerReconnect = (reason) => {
-    if (hasReconnected) return;
-    hasReconnected = true;
-
-    console.log(`[BOT] ${reason}. Reconnecting in 10 seconds...`);
-    
-    if (client) {
-      try { client.close(); } catch (e) {}
-    }
-
-    setTimeout(() => {
-      initBot();
-    }, 10000);
-  };
 
   client.on('join', () => {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
@@ -89,13 +126,44 @@ function initBot() {
     }
   });
 
-  // Reagujemy zarówno na błąd (w tym Connect timed out), jak i na zamknięcie gniazda
   client.on('error', (err) => {
     console.error('[BOT ERROR]', err.message || err);
-    triggerReconnect(`Error occurred (${err.message || err})`);
+    scheduleReconnect();
   });
 
   client.on('close', () => {
-    triggerReconnect('Connection closed');
+    console.log('[BOT] Connection closed.');
+    scheduleReconnect();
   });
 }
+
+function sendBedrockChat(client, message) {
+  try {
+    const cleanMessage = String(message).trim();
+    if (!cleanMessage) return;
+
+    client.queue('text', {
+      type: 'chat',
+      needs_translation: false,
+      source_name: client.username,
+      xuid: '',
+      platform_chat_id: '',
+      filtered_message: '',
+      message: cleanMessage
+    });
+
+    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
+  } catch (err) {
+    console.error('[CHAT ERROR]', err.message || err);
+  }
+}
+
+// Zabezpieczenie przed niewyłapanymi bólami Node.js, żeby Render NIE wyłączał aplikacji
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err.message || err);
+  scheduleReconnect();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+});
