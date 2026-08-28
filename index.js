@@ -75,6 +75,7 @@ function initBot() {
   currentClient = client;
 
   let botPosition = { x: 0, y: 0, z: 0 };
+  const playerPositions = {}; // Store known player coordinates dynamically
   let isProcessing = false;
   let isSpawned = false;
 
@@ -91,9 +92,42 @@ function initBot() {
     console.log('[BDS KICK REASON]', JSON.stringify(packet));
   });
 
+  // Track bot position and map runtime IDs to player names if available
   client.on('move_player', (packet) => {
     if (packet.runtime_id === client.entityId) {
       botPosition = packet.position;
+    } else {
+      // Look up if this runtime_id belongs to a tracked player
+      for (const [name, data] of Object.entries(playerPositions)) {
+        if (data.runtimeId === packet.runtime_id) {
+          data.position = packet.position;
+          break;
+        }
+      }
+    }
+  });
+
+  // Track player lists / entity metadata to correlate runtime IDs with usernames
+  client.on('player_list', (packet) => {
+    if (packet.records && packet.records.records) {
+      for (const record of packet.records.records) {
+        if (record.username && record.username !== client.username) {
+          if (!playerPositions[record.username]) {
+            playerPositions[record.username] = { runtimeId: null, position: { x: 0, y: 0, z: 0 } };
+          }
+        }
+      }
+    }
+  });
+
+  // Fallback entity metadata / add_player matching if needed
+  client.on('add_player', (packet) => {
+    if (packet.username) {
+      playerPositions[packet.username] = {
+        runtimeId: packet.runtime_id,
+        position: packet.position || { x: 0, y: 0, z: 0 }
+      };
+      console.log(`[TRACKING] Discovered player entity: ${packet.username} (Runtime ID: ${packet.runtime_id})`);
     }
   });
 
@@ -125,7 +159,10 @@ function initBot() {
     isProcessing = true;
 
     try {
-      const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
+      // Gather specific player position if available (e.g. EsnaSeiko)
+      const targetPlayerPos = playerPositions[sourceName]?.position || null;
+
+      const aiResult = await analyzeMessage(sourceName, messageText, botPosition, targetPlayerPos);
       if (aiResult) {
         if (aiResult.type === 'text' && aiResult.text) {
           sendBedrockChat(client, aiResult.text.trim(), isSpawned);
