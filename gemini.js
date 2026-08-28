@@ -15,15 +15,15 @@ async function analyzeMessage(username, messageText, botPos) {
   if (!ai) return null;
 
   try {
-    const prompt = `You are Alice, an AI companion in Minecraft Bedrock Edition.
+    const prompt = `You are Alice, an autonomous AI companion living inside Minecraft Bedrock Edition.
 Player "${username}" said: "${messageText}".
-Your current position is X:${Math.round(botPos.x)}, Y:${Math.round(botPos.y)}, Z:${Math.round(botPos.z)}.
+Your current coordinates are X:${Math.round(botPos.x)}, Y:${Math.round(botPos.y)}, Z:${Math.round(botPos.z)}.
 
-Decide whether to reply with text or perform an action.
+Decide how to respond. You can talk, move around, teleport if necessary, jump, or interact with the world.
 Respond ONLY in valid JSON matching the schema.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash-lite',
+      model: 'gemini-2.5-flash',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
@@ -36,19 +36,23 @@ Respond ONLY in valid JSON matching the schema.`;
             },
             text: {
               type: Type.STRING,
-              description: 'Message to respond in chat if type is text'
+              description: 'Chat response message if type is text'
             },
             action: {
               type: Type.OBJECT,
               properties: {
                 name: {
                   type: Type.STRING,
-                  enum: ['chatMessage']
+                  enum: ['chatMessage', 'moveTo', 'teleport', 'jump', 'dig']
                 },
                 args: {
                   type: Type.OBJECT,
                   properties: {
-                    message: { type: Type.STRING }
+                    message: { type: Type.STRING, description: 'Message to say in chat' },
+                    x: { type: Type.NUMBER, description: 'Target X coordinate' },
+                    y: { type: Type.NUMBER, description: 'Target Y coordinate' },
+                    z: { type: Type.NUMBER, description: 'Target Z coordinate' },
+                    blockName: { type: Type.STRING, description: 'Name of the block to dig or interact with' }
                   }
                 }
               }
