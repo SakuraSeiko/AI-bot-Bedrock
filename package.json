@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
-    "bedrockflayer": "latest"
+    "bedrockflayer": "github:torzodmc/mineflayer-for-bedrock"
   }
 }
