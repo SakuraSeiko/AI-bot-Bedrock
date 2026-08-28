@@ -98,11 +98,14 @@ function initBot() {
 
     console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
 
+    // Ignorowanie pustych wiadomości, własnych wypowiedzi bota i powiadomień systemowych/komend
     if (
       !messageText.trim() || 
       sourceName === client.username || 
       sourceName.includes('Alice') ||
-      messageText.includes('%')
+      messageText.includes('%') ||
+      messageText.includes('rawtext') ||
+      messageText.includes('commands.')
     ) {
       return;
     }
@@ -146,20 +149,23 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
-    // Poprawiona struktura pakietu command_request bez pustych undefined pól
-    client.queue('command_request', {
-      command: `/say ${cleanMessage}`,
-      origin: {
-        type: 'player',
-        uuid: '00000000-0000-0000-0000-000000000000',
-        request_id: '00000000-0000-0000-0000-000000000000',
-        player_entity_id: 0n // BigInt dla identyfikatora w nowszych wersjach protokołu Bedrock
-      },
-      internal: false,
-      version: '1.26.40'
-    });
+    // Użycie wyższego poziomu helpera bedrock-protocol do bezpiecznej wysyłki czatu
+    if (typeof client.chat === 'function') {
+      client.chat(cleanMessage);
+    } else {
+      // Domyślny fallback pakietu text dla gracza
+      client.queue('text', {
+        type: 'chat',
+        needs_translation: false,
+        source_name: client.username,
+        xuid: '',
+        platform_chat_id: '',
+        filtered_message: '',
+        message: cleanMessage
+      });
+    }
 
-    console.log(`[BOT SENT CHAT VIA CMD] ${cleanMessage}`);
+    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
