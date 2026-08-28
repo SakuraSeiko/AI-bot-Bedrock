@@ -1,6 +1,7 @@
 const http = require('http');
 const bedrock = require('bedrock-protocol');
 const { initGemini, analyzeMessage } = require('./gemini');
+const { moveToTarget, teleportTo, jump, digBlock } = require('./movement');
 
 const PORT = process.env.PORT || 3000;
 
@@ -102,7 +103,6 @@ function initBot() {
 
     console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
 
-    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE (Alice, Alice(2) itp.)
     const isAliceSelf = 
       sourceName === client.username || 
       sourceName.startsWith('Alice') ||
@@ -130,8 +130,28 @@ function initBot() {
         if (aiResult.type === 'text' && aiResult.text) {
           sendBedrockChat(client, aiResult.text.trim(), isSpawned);
         } else if (aiResult.type === 'function' && aiResult.action) {
-          if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-            sendBedrockChat(client, aiResult.action.args.message, isSpawned);
+          const action = aiResult.action;
+          
+          if (action.name === 'chatMessage' && action.args?.message) {
+            sendBedrockChat(client, action.args.message, isSpawned);
+          } else if (action.name === 'moveTo') {
+            const { x, y, z } = action.args;
+            if (x !== undefined && y !== undefined && z !== undefined) {
+              moveToTarget(client, botPosition, x, y, z);
+              sendBedrockChat(client, "I'm moving there now!", isSpawned);
+            }
+          } else if (action.name === 'teleport') {
+            const { x, y, z } = action.args;
+            if (x !== undefined && y !== undefined && z !== undefined) {
+              teleportTo(client, x, y, z);
+              sendBedrockChat(client, "Teleporting!", isSpawned);
+            }
+          } else if (action.name === 'jump') {
+            jump(client, botPosition);
+            sendBedrockChat(client, "Whee!", isSpawned);
+          } else if (action.name === 'dig') {
+            digBlock(client, action.args?.blockName);
+            sendBedrockChat(client, `Trying to dig ${action.args?.blockName || 'block'}!`, isSpawned);
           }
         }
       }
