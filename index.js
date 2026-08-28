@@ -75,9 +75,15 @@ function initBot() {
 
   let botPosition = { x: 0, y: 0, z: 0 };
   let isProcessing = false;
+  let isSpawned = false;
 
   client.on('join', () => {
-    console.log('[BOT] Alice successfully joined the Bedrock world!');
+    console.log('[BOT] Alice joined server, waiting for world spawn...');
+  });
+
+  client.on('spawn', () => {
+    console.log('[BOT] Alice fully spawned into the world!');
+    isSpawned = true;
   });
 
   client.on('disconnect', (packet) => {
@@ -116,10 +122,10 @@ function initBot() {
       const aiResult = await analyzeMessage(sourceName, messageText, botPosition);
       if (aiResult) {
         if (aiResult.type === 'text' && aiResult.text) {
-          sendBedrockChat(client, aiResult.text.trim());
+          sendBedrockChat(client, aiResult.text.trim(), isSpawned);
         } else if (aiResult.type === 'function' && aiResult.action) {
           if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-            sendBedrockChat(client, aiResult.action.args.message);
+            sendBedrockChat(client, aiResult.action.args.message, isSpawned);
           }
         }
       }
@@ -137,23 +143,30 @@ function initBot() {
 
   client.on('close', () => {
     console.log('[BOT] Connection closed.');
+    isSpawned = false;
     scheduleReconnect();
   });
 }
 
-function sendBedrockChat(client, message) {
+function sendBedrockChat(client, message, isSpawned) {
   try {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
-    // Komenda /me jest dostępna dla każdego gracza bez cheatów i ma osobną walidację w BDS
+    if (!isSpawned) {
+      console.log('[CHAT CANCELLED] Bot not fully spawned yet.');
+      return;
+    }
+
+    // Format zgodny ze specyfikacją Bedrock 1.26.x
     client.queue('command_request', {
       command: `/me ${cleanMessage}`,
+      version: 'latest',
       origin: {
         type: 'player',
         uuid: client.uuid || '00000000-0000-0000-0000-000000000000',
         request_id: '00000000-0000-0000-0000-000000000000',
-        player_entity_id: 0n
+        player_entity_id: BigInt(client.entityId || 0)
       },
       internal: false
     });
