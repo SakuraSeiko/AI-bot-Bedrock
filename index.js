@@ -69,13 +69,14 @@ function initBot() {
     offline: true,
     version: '1.26.40',
     skipPing: true,
-    connectTimeout: 30000
+    connectTimeout: 30000,
+    autoInitPlayer: true // Wymuszamy automatyczną inicjalizację lokalnego gracza
   });
 
   currentClient = client;
 
   let botPosition = { x: 0, y: 0, z: 0 };
-  const playerPositions = {}; // Store known player coordinates dynamically
+  const playerPositions = {}; // Dynamiczne przechowywanie pozycji graczy
   let isProcessing = false;
   let isSpawned = false;
 
@@ -86,18 +87,29 @@ function initBot() {
   client.on('spawn', () => {
     console.log('[BOT] Alice fully spawned into the world!');
     isSpawned = true;
+
+    // Jawne potwierdzenie inicjalizacji gracza na serwerze
+    if (client.entityId) {
+      try {
+        client.write('set_local_player_as_initialized', {
+          runtime_entity_id: client.entityId
+        });
+        console.log(`[BOT] Confirmed local player initialization for Runtime ID: ${client.entityId}`);
+      } catch (e) {
+        console.error('[BOT INIT PACKET ERROR]', e.message || e);
+      }
+    }
   });
 
   client.on('disconnect', (packet) => {
     console.log('[BDS KICK REASON]', JSON.stringify(packet));
   });
 
-  // Track bot position and map runtime IDs to player names if available
+  // Śledzenie pozycji bota oraz mapowanie runtime_id graczy
   client.on('move_player', (packet) => {
     if (packet.runtime_id === client.entityId) {
       botPosition = packet.position;
     } else {
-      // Look up if this runtime_id belongs to a tracked player
       for (const [name, data] of Object.entries(playerPositions)) {
         if (data.runtimeId === packet.runtime_id) {
           data.position = packet.position;
@@ -107,7 +119,7 @@ function initBot() {
     }
   });
 
-  // Track player lists / entity metadata to correlate runtime IDs with usernames
+  // Śledzenie listy graczy
   client.on('player_list', (packet) => {
     if (packet.records && packet.records.records) {
       for (const record of packet.records.records) {
@@ -120,7 +132,7 @@ function initBot() {
     }
   });
 
-  // Fallback entity metadata / add_player matching if needed
+  // Rejestracja nowo dodanych graczy do świata
   client.on('add_player', (packet) => {
     if (packet.username) {
       playerPositions[packet.username] = {
@@ -159,7 +171,6 @@ function initBot() {
     isProcessing = true;
 
     try {
-      // Gather specific player position if available (e.g. EsnaSeiko)
       const targetPlayerPos = playerPositions[sourceName]?.position || null;
 
       const aiResult = await analyzeMessage(sourceName, messageText, botPosition, targetPlayerPos);
