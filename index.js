@@ -70,6 +70,14 @@ function initBot() {
     connectTimeout: 30000
   });
 
+  // IMMEDIATE PHYSICS GUARD: Initialize entity structure immediately after bot creation 
+  // to prevent bedrockflayer physics tick from crashing before spawn packets arrive.
+  bot.entity = {
+    position: { x: 0, y: 0, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    onGround: true
+  };
+
   currentBot = bot;
 
   let isProcessing = false;
@@ -78,19 +86,12 @@ function initBot() {
   bot.on('spawn', () => {
     console.log('[BOT] Alice fully spawned into the world!');
     isSpawned = true;
-
-    // Zabezpieczenie fizyki bedrockflayer przed błędem "Cannot read properties of undefined (reading 'x')"
-    if (!bot.entity) {
-      bot.entity = { position: { x: 0, y: 0, z: 0 } };
-    } else if (!bot.entity.position) {
-      bot.entity.position = { x: 0, y: 0, z: 0 };
-    }
   });
 
   bot.on('chat', async (username, messageText) => {
     console.log(`[RAW CHAT] Source: "${username}", Text: "${messageText}"`);
 
-    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE
+    // IGNORE SELF MESSAGES AND ALICE CLONES
     const isAliceSelf = 
       username === bot.username || 
       username.startsWith('Alice') ||
