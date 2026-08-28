@@ -83,6 +83,28 @@ function initBot() {
     console.log('[BOT] Alice joined server, waiting for world spawn...');
   });
 
+  // Obsługa pakietów startowych (zasoby i synchronizacja ticków z clientInternal.js)
+  client.on('resource_packs_info', (packet) => {
+    console.log('[BOT] Handling resource packs info...');
+    client.write('resource_pack_client_response', {
+      response_status: 'completed',
+      response_status_name: 'resourcepackstackfinished',
+      resourcepackids: []
+    });
+
+    client.once('resource_pack_stack', (stack) => {
+      client.write('resource_pack_client_response', {
+        response_status: 'completed',
+        response_status_name: 'resourcepackstackfinished',
+        resourcepackids: []
+      });
+    });
+
+    client.queue('client_cache_status', { enabled: false });
+    client.queue('request_chunk_radius', { chunk_radius: 2 });
+    client.queue('tick_sync', { request_time: BigInt(Date.now()), response_time: 0n });
+  });
+
   client.on('spawn', () => {
     console.log('[BOT] Alice fully spawned into the world!');
     isSpawned = true;
