@@ -65,7 +65,9 @@ function initBot() {
     port: port,
     username: 'Alice',
     offline: true,
-    version: '1.26.40'
+    version: '1.26.40',
+    skipPing: true,
+    connectTimeout: 30000
   });
 
   currentBot = bot;
@@ -81,7 +83,7 @@ function initBot() {
   bot.on('chat', async (username, messageText) => {
     console.log(`[RAW CHAT] Source: "${username}", Text: "${messageText}"`);
 
-    // Ignore self-messages and Alice clones
+    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE (Alice, Alice(2) itp.)
     const isAliceSelf = 
       username === bot.username || 
       username.startsWith('Alice') ||
@@ -146,8 +148,26 @@ function sendBedrockChat(bot, message, isSpawned) {
       return;
     }
 
-    bot.chat(cleanMessage);
-    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
+    const client = bot._client || bot.client;
+
+    if (!client) {
+      console.error('[CHAT ERROR] Underlying bedrock client not available.');
+      return;
+    }
+
+    client.queue('command_request', {
+      command: `/me ${cleanMessage}`,
+      version: 'latest',
+      origin: {
+        type: 'player',
+        uuid: client.uuid || '00000000-0000-0000-0000-000000000000',
+        request_id: '00000000-0000-0000-0000-000000000000',
+        player_entity_id: BigInt(client.entityId || 0)
+      },
+      internal: false
+    });
+
+    console.log(`[BOT SENT CHAT VIA /ME] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
