@@ -4,7 +4,6 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// Serwer HTTP pod Back4App
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -49,7 +48,7 @@ function initBot() {
     return;
   }
 
-  const host = process.env.BEDROCK_HOST || 'BakaAdv.aternos.me';
+  const host = process.env.BEDROCK_HOST || 'EsnaSeiko.aternos.me';
   const port = parseInt(process.env.BEDROCK_PORT || '11008', 10);
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as Alice...`);
@@ -61,7 +60,6 @@ function initBot() {
     currentBot = null;
   }
 
-  // Tworzenie bota z silnikiem fizycznym Mineflayera
   const bot = bedrockflayer.createBot({
     host: host,
     port: port,
@@ -76,14 +74,14 @@ function initBot() {
   let isSpawned = false;
 
   bot.on('spawn', () => {
-    console.log('[BOT] Alice fully spawned into the world with physical engine enabled!');
+    console.log('[BOT] Alice fully spawned into the world!');
     isSpawned = true;
   });
 
   bot.on('chat', async (username, messageText) => {
     console.log(`[RAW CHAT] Source: "${username}", Text: "${messageText}"`);
 
-    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE
+    // Ignore self-messages and Alice clones
     const isAliceSelf = 
       username === bot.username || 
       username.startsWith('Alice') ||
@@ -105,17 +103,17 @@ function initBot() {
     if (isProcessing) return;
     isProcessing = true;
 
-    // Pobieranie pozycji z silnika fizycznego bota
-    const botPos = bot.entity ? bot.entity.position : { x: 0, y: 0, z: 0 };
+    // Retrieve entity position from physics engine
+    const botPosition = bot.entity ? bot.entity.position : { x: 0, y: 0, z: 0 };
 
     try {
-      const aiResult = await analyzeMessage(username, messageText, botPos);
+      const aiResult = await analyzeMessage(username, messageText, botPosition);
       if (aiResult) {
         if (aiResult.type === 'text' && aiResult.text) {
-          sendChat(bot, aiResult.text.trim(), isSpawned);
+          sendBedrockChat(bot, aiResult.text.trim(), isSpawned);
         } else if (aiResult.type === 'function' && aiResult.action) {
           if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
-            sendChat(bot, aiResult.action.args.message, isSpawned);
+            sendBedrockChat(bot, aiResult.action.args.message, isSpawned);
           }
         }
       }
@@ -138,7 +136,7 @@ function initBot() {
   });
 }
 
-function sendChat(bot, message, isSpawned) {
+function sendBedrockChat(bot, message, isSpawned) {
   try {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
