@@ -1,10 +1,10 @@
 const http = require('http');
-const bedrock = require('bedrock-protocol');
+const bedrockflayer = require('bedrockflayer');
 const { initGemini, analyzeMessage } = require('./gemini');
-const { moveToTarget, teleportTo, jump, digBlock } = require('./movement');
 
 const PORT = process.env.PORT || 3000;
 
+// Serwer HTTP pod Back4App
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -20,7 +20,7 @@ server.listen(PORT, () => {
   startBotSafely();
 });
 
-let currentClient = null;
+let currentBot = null;
 let reconnectTimer = null;
 
 function startBotSafely() {
@@ -54,104 +54,39 @@ function initBot() {
 
   console.log(`[BOT] Connecting to Bedrock server ${host}:${port} as Alice...`);
 
-  if (currentClient) {
+  if (currentBot) {
     try {
-      currentClient.removeAllListeners();
-      currentClient.close();
+      currentBot.quit();
     } catch (e) {}
-    currentClient = null;
+    currentBot = null;
   }
 
-  const client = bedrock.createClient({
+  // Tworzenie bota z silnikiem fizycznym Mineflayera
+  const bot = bedrockflayer.createBot({
     host: host,
     port: port,
     username: 'Alice',
     offline: true,
-    version: '1.26.40',
-    skipPing: true,
-    connectTimeout: 30000,
-    autoInitPlayer: true // Wymuszamy automatyczną inicjalizację lokalnego gracza
+    version: '1.26.40'
   });
 
-  currentClient = client;
+  currentBot = bot;
 
-  let botPosition = { x: 0, y: 0, z: 0 };
-  const playerPositions = {}; // Dynamiczne przechowywanie pozycji graczy
   let isProcessing = false;
   let isSpawned = false;
 
-  client.on('join', () => {
-    console.log('[BOT] Alice joined server, waiting for world spawn...');
-  });
-
-  client.on('spawn', () => {
-    console.log('[BOT] Alice fully spawned into the world!');
+  bot.on('spawn', () => {
+    console.log('[BOT] Alice fully spawned into the world with physical engine enabled!');
     isSpawned = true;
-
-    // Jawne potwierdzenie inicjalizacji gracza na serwerze
-    if (client.entityId) {
-      try {
-        client.write('set_local_player_as_initialized', {
-          runtime_entity_id: client.entityId
-        });
-        console.log(`[BOT] Confirmed local player initialization for Runtime ID: ${client.entityId}`);
-      } catch (e) {
-        console.error('[BOT INIT PACKET ERROR]', e.message || e);
-      }
-    }
   });
 
-  client.on('disconnect', (packet) => {
-    console.log('[BDS KICK REASON]', JSON.stringify(packet));
-  });
+  bot.on('chat', async (username, messageText) => {
+    console.log(`[RAW CHAT] Source: "${username}", Text: "${messageText}"`);
 
-  // Śledzenie pozycji bota oraz mapowanie runtime_id graczy
-  client.on('move_player', (packet) => {
-    if (packet.runtime_id === client.entityId) {
-      botPosition = packet.position;
-    } else {
-      for (const [name, data] of Object.entries(playerPositions)) {
-        if (data.runtimeId === packet.runtime_id) {
-          data.position = packet.position;
-          break;
-        }
-      }
-    }
-  });
-
-  // Śledzenie listy graczy
-  client.on('player_list', (packet) => {
-    if (packet.records && packet.records.records) {
-      for (const record of packet.records.records) {
-        if (record.username && record.username !== client.username) {
-          if (!playerPositions[record.username]) {
-            playerPositions[record.username] = { runtimeId: null, position: { x: 0, y: 0, z: 0 } };
-          }
-        }
-      }
-    }
-  });
-
-  // Rejestracja nowo dodanych graczy do świata
-  client.on('add_player', (packet) => {
-    if (packet.username) {
-      playerPositions[packet.username] = {
-        runtimeId: packet.runtime_id,
-        position: packet.position || { x: 0, y: 0, z: 0 }
-      };
-      console.log(`[TRACKING] Discovered player entity: ${packet.username} (Runtime ID: ${packet.runtime_id})`);
-    }
-  });
-
-  client.on('text', async (packet) => {
-    const messageText = packet.message || packet.param2 || '';
-    const sourceName = packet.source_name || packet.param1 || '';
-
-    console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
-
+    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE
     const isAliceSelf = 
-      sourceName === client.username || 
-      sourceName.startsWith('Alice') ||
+      username === bot.username || 
+      username.startsWith('Alice') ||
       messageText.startsWith('* Alice') ||
       messageText.startsWith('Alice:');
 
@@ -165,41 +100,22 @@ function initBot() {
       return;
     }
 
-    console.log(`[PROCESSING CHAT] ${sourceName}: ${messageText}`);
+    console.log(`[PROCESSING CHAT] ${username}: ${messageText}`);
 
     if (isProcessing) return;
     isProcessing = true;
 
-    try {
-      const targetPlayerPos = playerPositions[sourceName]?.position || null;
+    // Pobieranie pozycji z silnika fizycznego bota
+    const botPos = bot.entity ? bot.entity.position : { x: 0, y: 0, z: 0 };
 
-      const aiResult = await analyzeMessage(sourceName, messageText, botPosition, targetPlayerPos);
+    try {
+      const aiResult = await analyzeMessage(username, messageText, botPos);
       if (aiResult) {
         if (aiResult.type === 'text' && aiResult.text) {
-          sendBedrockChat(client, aiResult.text.trim(), isSpawned);
+          sendChat(bot, aiResult.text.trim(), isSpawned);
         } else if (aiResult.type === 'function' && aiResult.action) {
-          const action = aiResult.action;
-          
-          if (action.name === 'chatMessage' && action.args?.message) {
-            sendBedrockChat(client, action.args.message, isSpawned);
-          } else if (action.name === 'moveTo') {
-            const { x, y, z } = action.args;
-            if (x !== undefined && y !== undefined && z !== undefined) {
-              moveToTarget(client, botPosition, x, y, z);
-              sendBedrockChat(client, "I'm moving there now!", isSpawned);
-            }
-          } else if (action.name === 'teleport') {
-            const { x, y, z } = action.args;
-            if (x !== undefined && y !== undefined && z !== undefined) {
-              teleportTo(client, x, y, z);
-              sendBedrockChat(client, "Teleporting!", isSpawned);
-            }
-          } else if (action.name === 'jump') {
-            jump(client, botPosition);
-            sendBedrockChat(client, "Whee!", isSpawned);
-          } else if (action.name === 'dig') {
-            digBlock(client, action.args?.blockName);
-            sendBedrockChat(client, `Trying to dig ${action.args?.blockName || 'block'}!`, isSpawned);
+          if (aiResult.action.name === 'chatMessage' && aiResult.action.args?.message) {
+            sendChat(bot, aiResult.action.args.message, isSpawned);
           }
         }
       }
@@ -210,19 +126,19 @@ function initBot() {
     }
   });
 
-  client.on('error', (err) => {
+  bot.on('error', (err) => {
     console.error('[BOT ERROR]', err.message || err);
     scheduleReconnect();
   });
 
-  client.on('close', () => {
-    console.log('[BOT] Connection closed.');
+  bot.on('end', () => {
+    console.log('[BOT] Connection ended.');
     isSpawned = false;
     scheduleReconnect();
   });
 }
 
-function sendBedrockChat(client, message, isSpawned) {
+function sendChat(bot, message, isSpawned) {
   try {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
@@ -232,19 +148,8 @@ function sendBedrockChat(client, message, isSpawned) {
       return;
     }
 
-    client.queue('command_request', {
-      command: `/me ${cleanMessage}`,
-      version: 'latest',
-      origin: {
-        type: 'player',
-        uuid: client.uuid || '00000000-0000-0000-0000-000000000000',
-        request_id: '00000000-0000-0000-0000-000000000000',
-        player_entity_id: BigInt(client.entityId || 0)
-      },
-      internal: false
-    });
-
-    console.log(`[BOT SENT CHAT VIA /ME] ${cleanMessage}`);
+    bot.chat(cleanMessage);
+    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
