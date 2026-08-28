@@ -67,8 +67,7 @@ function initBot() {
     offline: true,
     version: '1.26.40',
     skipPing: true,
-    connectTimeout: 30000,
-    physicsEnabled: false
+    connectTimeout: 30000
   });
 
   currentBot = bot;
@@ -84,7 +83,7 @@ function initBot() {
   bot.on('chat', async (username, messageText) => {
     console.log(`[RAW CHAT] Source: "${username}", Text: "${messageText}"`);
 
-    // IGNORE SELF MESSAGES AND ALICE CLONES
+    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE (Alice, Alice(2) itp.)
     const isAliceSelf = 
       username === bot.username || 
       username.startsWith('Alice') ||
@@ -106,6 +105,7 @@ function initBot() {
     if (isProcessing) return;
     isProcessing = true;
 
+    // Retrieve entity position from physics engine
     const botPosition = bot.entity ? bot.entity.position : { x: 0, y: 0, z: 0 };
 
     try {
