@@ -4,7 +4,6 @@ const { initGemini, analyzeMessage } = require('./gemini');
 
 const PORT = process.env.PORT || 3000;
 
-// Serwer HTTP działa całkowicie niezależnie od bota
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Alice Bedrock AI Bot Service is active.\n');
@@ -81,7 +80,6 @@ function initBot() {
     console.log('[BOT] Alice successfully joined the Bedrock world!');
   });
 
-  // Nasłuchiwanie dokładnego powodu rozłączenia przez natywny serwer BDS
   client.on('disconnect', (packet) => {
     console.log('[BDS KICK REASON]', JSON.stringify(packet));
   });
@@ -98,7 +96,6 @@ function initBot() {
 
     console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
 
-    // Ignorowanie pustych wiadomości, własnych wypowiedzi bota i powiadomień systemowych/komend
     if (
       !messageText.trim() || 
       sourceName === client.username || 
@@ -149,23 +146,19 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
-    // Użycie wyższego poziomu helpera bedrock-protocol do bezpiecznej wysyłki czatu
-    if (typeof client.chat === 'function') {
-      client.chat(cleanMessage);
-    } else {
-      // Domyślny fallback pakietu text dla gracza
-      client.queue('text', {
-        type: 'chat',
-        needs_translation: false,
-        source_name: client.username,
-        xuid: '',
-        platform_chat_id: '',
-        filtered_message: '',
-        message: cleanMessage
-      });
-    }
+    // Komenda /me jest dostępna dla każdego gracza bez cheatów i ma osobną walidację w BDS
+    client.queue('command_request', {
+      command: `/me ${cleanMessage}`,
+      origin: {
+        type: 'player',
+        uuid: client.uuid || '00000000-0000-0000-0000-000000000000',
+        request_id: '00000000-0000-0000-0000-000000000000',
+        player_entity_id: 0n
+      },
+      internal: false
+    });
 
-    console.log(`[BOT SENT CHAT] ${cleanMessage}`);
+    console.log(`[BOT SENT CHAT VIA /ME] ${cleanMessage}`);
   } catch (err) {
     console.error('[CHAT ERROR]', err.message || err);
   }
