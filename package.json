@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
-    "bedrockflayer": "github:Dzak-Dev/mineflayer-for-bedrock"
+    "bedrockflayer": "github:SakuraSeiko/mineflayer-for-bedrock"
   }
 }
