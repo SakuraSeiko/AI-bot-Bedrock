@@ -23,7 +23,7 @@ Decide how to respond. You can talk, move around, teleport if necessary, jump, o
 Respond ONLY in valid JSON matching the schema.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.5-flash-lite',
       contents: prompt,
       config: {
         responseMimeType: 'application/json',
