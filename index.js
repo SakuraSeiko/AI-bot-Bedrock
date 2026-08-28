@@ -22,7 +22,6 @@ server.listen(PORT, () => {
 
 let currentClient = null;
 let reconnectTimer = null;
-let tickLoop = null;
 
 function startBotSafely() {
   if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -37,10 +36,6 @@ function startBotSafely() {
 
 function scheduleReconnect() {
   if (reconnectTimer) return;
-  if (tickLoop) {
-    clearInterval(tickLoop);
-    tickLoop = null;
-  }
   console.log('[BOT] Scheduling reconnect in 10 seconds...');
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
@@ -61,12 +56,10 @@ function initBot() {
 
   if (currentClient) {
     try {
-      if (tickLoop) clearInterval(tickLoop);
       currentClient.removeAllListeners();
       currentClient.close();
     } catch (e) {}
     currentClient = null;
-    tickLoop = null;
   }
 
   const client = bedrock.createClient({
@@ -82,43 +75,12 @@ function initBot() {
   currentClient = client;
 
   let botPosition = { x: 0, y: 0, z: 0 };
-  const playerPositions = {}; 
+  const playerPositions = {}; // Store known player coordinates dynamically
   let isProcessing = false;
   let isSpawned = false;
 
   client.on('join', () => {
-    console.log('[BOT] Alice joined server, waiting for resource packs...');
-  });
-
-  // Oficjalna sekwencja obsługi zasobów i ticków wyciągnięta z dumpPackets.js
-  client.once('resource_packs_info', (packet) => {
-    console.log('[BOT] Handling resource packs info...');
-    client.write('resource_pack_client_response', {
-      response_status: 'completed',
-      response_status_name: 'resourcepackstackfinished',
-      resourcepackids: []
-    });
-
-    client.once('resource_pack_stack', (stack) => {
-      client.write('resource_pack_client_response', {
-        response_status: 'completed',
-        response_status_name: 'resourcepackstackfinished',
-        resourcepackids: []
-      });
-    });
-
-    client.queue('client_cache_status', { enabled: false });
-    client.queue('request_chunk_radius', { chunk_radius: 2 });
-
-    if (tickLoop) clearInterval(tickLoop);
-    tickLoop = setInterval(() => {
-      try {
-        client.queue('tick_sync', { 
-          request_time: BigInt(Date.now()), 
-          response_time: BigInt(Date.now()) 
-        });
-      } catch (e) {}
-    }, 200);
+    console.log('[BOT] Alice joined server, waiting for world spawn...');
   });
 
   client.on('spawn', () => {
@@ -130,10 +92,12 @@ function initBot() {
     console.log('[BDS KICK REASON]', JSON.stringify(packet));
   });
 
+  // Track bot position and map runtime IDs to player names if available
   client.on('move_player', (packet) => {
     if (packet.runtime_id === client.entityId) {
       botPosition = packet.position;
     } else {
+      // Look up if this runtime_id belongs to a tracked player
       for (const [name, data] of Object.entries(playerPositions)) {
         if (data.runtimeId === packet.runtime_id) {
           data.position = packet.position;
@@ -143,6 +107,7 @@ function initBot() {
     }
   });
 
+  // Track player lists / entity metadata to correlate runtime IDs with usernames
   client.on('player_list', (packet) => {
     if (packet.records && packet.records.records) {
       for (const record of packet.records.records) {
@@ -155,6 +120,7 @@ function initBot() {
     }
   });
 
+  // Fallback entity metadata / add_player matching if needed
   client.on('add_player', (packet) => {
     if (packet.username) {
       playerPositions[packet.username] = {
@@ -193,6 +159,7 @@ function initBot() {
     isProcessing = true;
 
     try {
+      // Gather specific player position if available (e.g. EsnaSeiko)
       const targetPlayerPos = playerPositions[sourceName]?.position || null;
 
       const aiResult = await analyzeMessage(sourceName, messageText, botPosition, targetPlayerPos);
@@ -240,10 +207,6 @@ function initBot() {
   client.on('close', () => {
     console.log('[BOT] Connection closed.');
     isSpawned = false;
-    if (tickLoop) {
-      clearInterval(tickLoop);
-      tickLoop = null;
-    }
     scheduleReconnect();
   });
 }
