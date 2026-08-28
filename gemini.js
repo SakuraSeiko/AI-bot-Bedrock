@@ -11,15 +11,21 @@ function initGemini() {
   console.log('[GEMINI] Initialized successfully.');
 }
 
-async function analyzeMessage(username, messageText, botPos) {
+async function analyzeMessage(username, messageText, botPos, playerPos = null) {
   if (!ai) return null;
 
   try {
+    let playerPosString = 'Unknown';
+    if (playerPos && playerPos.x !== undefined && playerPos.y !== undefined && playerPos.z !== undefined) {
+      playerPosString = `X:${Math.round(playerPos.x)}, Y:${Math.round(playerPos.y)}, Z:${Math.round(playerPos.z)}`;
+    }
+
     const prompt = `You are Alice, an autonomous AI companion living inside Minecraft Bedrock Edition.
 Player "${username}" said: "${messageText}".
 Your current coordinates are X:${Math.round(botPos.x)}, Y:${Math.round(botPos.y)}, Z:${Math.round(botPos.z)}.
+Player "${username}" coordinates are: ${playerPosString}.
 
-Decide how to respond. You can talk, move around, teleport if necessary, jump, or interact with the world.
+Decide how to respond. If the player asks you to come to them, use the 'moveTo' action with their coordinates if available. You can talk, move around, teleport if necessary, jump, or interact with the world.
 Respond ONLY in valid JSON matching the schema.`;
 
     const response = await ai.models.generateContent({
