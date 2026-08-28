@@ -146,15 +146,16 @@ function sendBedrockChat(client, message) {
     const cleanMessage = String(message).trim();
     if (!cleanMessage) return;
 
+    // Standardowy układ pól command_request akceptowany przez protodef
     client.queue('command_request', {
       command: `/say ${cleanMessage}`,
       origin: {
         type: 'player',
         uuid: '',
-        request_id: ''
+        request_id: '',
+        player_entity_id: 0
       },
-      internal: false,
-      version: 662
+      internal: false
     });
 
     console.log(`[BOT SENT CHAT VIA CMD] ${cleanMessage}`);
