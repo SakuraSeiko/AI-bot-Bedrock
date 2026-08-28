@@ -102,10 +102,16 @@ function initBot() {
 
     console.log(`[RAW CHAT] Source: "${sourceName}", Text: "${messageText}"`);
 
+    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE (Alice, Alice(2) itp.)
+    const isAliceSelf = 
+      sourceName === client.username || 
+      sourceName.startsWith('Alice') ||
+      messageText.startsWith('* Alice') ||
+      messageText.startsWith('Alice:');
+
     if (
       !messageText.trim() || 
-      sourceName === client.username || 
-      sourceName.includes('Alice') ||
+      isAliceSelf ||
       messageText.includes('%') ||
       messageText.includes('rawtext') ||
       messageText.includes('commands.')
@@ -158,7 +164,6 @@ function sendBedrockChat(client, message, isSpawned) {
       return;
     }
 
-    // Format zgodny ze specyfikacją Bedrock 1.26.x
     client.queue('command_request', {
       command: `/me ${cleanMessage}`,
       version: 'latest',
