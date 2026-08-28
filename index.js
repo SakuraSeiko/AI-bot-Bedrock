@@ -67,16 +67,9 @@ function initBot() {
     offline: true,
     version: '1.26.40',
     skipPing: true,
-    connectTimeout: 30000
+    connectTimeout: 30000,
+    physicsEnabled: false
   });
-
-  // IMMEDIATE PHYSICS GUARD: Initialize entity structure immediately after bot creation 
-  // to prevent bedrockflayer physics tick from crashing before spawn packets arrive.
-  bot.entity = {
-    position: { x: 0, y: 0, z: 0 },
-    velocity: { x: 0, y: 0, z: 0 },
-    onGround: true
-  };
 
   currentBot = bot;
 
