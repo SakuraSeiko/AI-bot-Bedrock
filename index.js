@@ -78,12 +78,19 @@ function initBot() {
   bot.on('spawn', () => {
     console.log('[BOT] Alice fully spawned into the world!');
     isSpawned = true;
+
+    // Zabezpieczenie fizyki bedrockflayer przed błędem "Cannot read properties of undefined (reading 'x')"
+    if (!bot.entity) {
+      bot.entity = { position: { x: 0, y: 0, z: 0 } };
+    } else if (!bot.entity.position) {
+      bot.entity.position = { x: 0, y: 0, z: 0 };
+    }
   });
 
   bot.on('chat', async (username, messageText) => {
     console.log(`[RAW CHAT] Source: "${username}", Text: "${messageText}"`);
 
-    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE (Alice, Alice(2) itp.)
+    // IGNOROWANIE WŁASNYCH WIADOMOŚCI ORAZ KLONÓW ALICE
     const isAliceSelf = 
       username === bot.username || 
       username.startsWith('Alice') ||
@@ -105,7 +112,6 @@ function initBot() {
     if (isProcessing) return;
     isProcessing = true;
 
-    // Retrieve entity position from physics engine
     const botPosition = bot.entity ? bot.entity.position : { x: 0, y: 0, z: 0 };
 
     try {
